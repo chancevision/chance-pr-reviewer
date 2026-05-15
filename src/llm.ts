@@ -4,13 +4,15 @@ import { buildMessages } from "./prompt.js";
 import type { Env } from "./config.js";
 
 export function createLLMClient(env: Env): OpenAI {
+  const headers: Record<string, string> = {
+    "HTTP-Referer": "https://github.com/agent-pr-review",
+    "X-OpenRouter-Title": "PR Review Agent",
+  };
+
   return new OpenAI({
     baseURL: env.LLM_BASE_URL,
     apiKey: env.LLM_API_KEY,
-    defaultHeaders: {
-      "HTTP-Referer": "https://github.com/agent-pr-review",
-      "X-OpenRouter-Title": "PR Review Agent",
-    },
+    defaultHeaders: headers,
   });
 }
 
@@ -33,12 +35,19 @@ export async function callLLM(
   let lastError: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const completion = await client.chat.completions.create({
+      const params: Record<string, unknown> = {
         model: env.LLM_MODEL,
         messages,
-        temperature: 0.3,
-        max_tokens: 4096,
-      });
+        max_tokens: 8192,
+      };
+
+      if (env.LLM_ENABLE_THINKING) {
+        params.reasoning_effort = "high";
+      } else {
+        params.temperature = 0.3;
+      }
+
+      const completion = await client.chat.completions.create(params as any);
 
       const raw = completion.choices[0]?.message?.content;
       if (!raw) throw new Error("Empty response from LLM");

@@ -7,6 +7,10 @@ const envSchema = z.object({
   GITHUB_APP_ID: z.string().transform((v) => Number(v)),
   GITHUB_APP_PRIVATE_KEY: z.string().min(1, "GITHUB_APP_PRIVATE_KEY is required"),
   GITHUB_WEBHOOK_SECRET: z.string().min(1, "GITHUB_WEBHOOK_SECRET is required"),
+  LLM_ENABLE_THINKING: z
+    .enum(["true", "false"])
+    .transform((v) => v === "true")
+    .default("false"),
   PORT: z
     .string()
     .transform((v) => Number(v))
