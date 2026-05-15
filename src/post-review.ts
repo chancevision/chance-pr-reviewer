@@ -1,7 +1,19 @@
 import type { Octokit } from "@octokit/rest";
-import type { ReviewResult } from "./review-schema.js";
+import type { ReviewResult, Verdict } from "./review-schema.js";
 import { formatReviewBody, formatInlineComments } from "./format-review.js";
 import { setCommitStatus } from "./status.js";
+
+function verdictToEvent(verdict: Verdict): "APPROVE" | "COMMENT" | "REQUEST_CHANGES" {
+  switch (verdict) {
+    case "VERY_SAFE":
+      return "APPROVE";
+    case "SAFE":
+      return "COMMENT";
+    case "CAUTION":
+    case "RISKY":
+      return "REQUEST_CHANGES";
+  }
+}
 
 export async function postPlaceholderComment(
   octokit: Octokit,
@@ -63,7 +75,7 @@ export async function postReview(
     pull_number: pullNumber,
     commit_id: headSha,
     body,
-    event: "COMMENT",
+    event: verdictToEvent(review.verdict),
     comments,
   });
 
@@ -85,7 +97,10 @@ export async function runReviewFlow(
     const review = await runReview();
 
     const scoreDesc = `${review.overallScore.toFixed(1)}/5 — ${review.verdict}`;
-    const statusState = review.verdict === "RISKY" ? "failure" : "success";
+    const statusState =
+      review.verdict === "VERY_SAFE" || review.verdict === "SAFE"
+        ? "success"
+        : "failure";
 
     await deletePlaceholderComment(octokit, owner, repo, placeholderId);
     await setCommitStatus(octokit, owner, repo, headSha, statusState, scoreDesc);
