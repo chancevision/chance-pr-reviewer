@@ -59,7 +59,12 @@ export async function callLLM(
     } catch (err) {
       lastError = err;
       if (attempt < 2) {
-        console.warn(`LLM response parse failed (attempt ${attempt + 1}/3), retrying...`);
+        const detail = err instanceof SyntaxError
+          ? err.message
+          : err instanceof Error && 'issues' in (err as any)
+            ? (err as any).issues?.map((i: any) => i.path.join('.') + ': ' + i.message).join(', ')
+            : String(err);
+        console.warn(`LLM response parse failed (attempt ${attempt + 1}/3): ${detail}`);
       }
     }
   }

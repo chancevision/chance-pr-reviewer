@@ -10,14 +10,14 @@ export const securityVerdictEnum = z.enum(["cleared", "flagged"]);
 export type SecurityVerdict = z.infer<typeof securityVerdictEnum>;
 
 export const dimensionSchema = z.object({
-  score: z.number().int().min(1).max(5),
+  score: z.number().min(1).max(5).transform((v) => Math.round(v)),
   issues: z.array(z.string()),
   highlights: z.array(z.string()),
 });
 
 export const inlineCommentSchema = z.object({
   file: z.string(),
-  line: z.number().int().positive(),
+  line: z.number().positive().transform((v) => Math.round(v)),
   severity: severityEnum,
   comment: z.string(),
 });
