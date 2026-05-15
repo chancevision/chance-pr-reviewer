@@ -8,6 +8,14 @@ const DIMENSION_LABELS: Record<string, string> = {
   consistency: "Consistency & Best Practices",
 };
 
+const SCORE_PILL: Record<number, string> = {
+  1: "`🔴 1`",
+  2: "`🟠 2`",
+  3: "`🟡 3`",
+  4: "`🟢 4`",
+  5: "`🟢 5`",
+};
+
 const SEVERITY_EMOJI: Record<string, string> = {
   critical: "🔴",
   warning: "🟡",
@@ -26,45 +34,77 @@ function formatDimension(
   dim: { score: number; issues: string[]; highlights: string[] },
 ): string {
   const label = DIMENSION_LABELS[key] || key;
-  const bar = "█".repeat(dim.score) + "░".repeat(5 - dim.score);
-  let out = `### ${label} — ${bar} ${dim.score}/5\n\n`;
+  const pill = SCORE_PILL[dim.score] || `\`  ${dim.score}\``;
+  let out = `**${label}** ${pill}\n`;
 
   if (dim.highlights.length > 0) {
-    out += "**Highlights:**\n";
     for (const h of dim.highlights) {
       out += `- ✅ ${h}\n`;
     }
-    out += "\n";
   }
 
   if (dim.issues.length > 0) {
-    out += "**Issues:**\n";
     for (const i of dim.issues) {
       out += `- ⚠️ ${i}\n`;
     }
-    out += "\n";
   }
 
   if (dim.issues.length === 0 && dim.highlights.length === 0) {
-    out += "_No findings._\n\n";
+    out += "_No findings._\n";
   }
 
+  out += "\n";
   return out;
 }
 
 export function formatReviewBody(review: ReviewResult): string {
   const v = VERDICT_EMOJI[review.verdict] || "⚪";
-  let body = `## 🤖 AI Code Review\n\n`;
-  body += `**Summary:** ${review.summary}\n\n`;
-  body += `---\n\n`;
+  const sevV = review.securityVerdict.status === "cleared" ? "✅" : "🔴";
+  const repV = review.reproducibility.possible ? "✅" : "⚠️";
+  const proofV = review.behaviorProof.present ? "✅" : "⚠️";
 
+  let body = `## AI Code Review\n\n`;
+  body += `> ${review.summary}\n\n`;
+
+  // Quick status table
+  body += `| | |\n|---|---|\n`;
+  body += `| Reproducibility | ${repV} ${review.reproducibility.method} |\n`;
+  body += `| Behavior Proof | ${proofV} ${review.behaviorProof.evidence} |\n`;
+  body += `| Security | ${sevV} ${review.securityVerdict.status} |\n`;
+  body += `| Next Step | ${review.nextStep} |\n`;
+  body += `\n`;
+
+  // Scores
   for (const [key, dim] of Object.entries(review.dimensions)) {
     body += formatDimension(key, dim);
   }
 
-  body += `---\n\n`;
-  body += `## ${v} Safety Score: **${review.overallScore.toFixed(1)}/5** — ${review.verdict}\n\n`;
-  body += `> Reviewed by agent-pr-review AI. This is automated feedback — use your judgment.\n`;
+  body += `---\n`;
+  body += `**${v} Safety Score: ${review.overallScore.toFixed(1)}/5 — ${review.verdict}**\n\n`;
+
+  // Collapsible details (clawsweeper-style)
+  body += `<details>\n<summary>Review details</summary>\n\n`;
+  body += `**Evidence from source:** ${review.reproducibility.detail}\n\n`;
+  body += `**Security:** ${review.securityVerdict.detail}\n\n`;
+
+  if (review.acceptanceCriteria.length > 0) {
+    body += `**Acceptance criteria:**\n`;
+    for (const cmd of review.acceptanceCriteria) {
+      body += `- \`${cmd}\`\n`;
+    }
+    body += `\n`;
+  }
+
+  if (review.relatedContributors.length > 0) {
+    body += `**Likely related contributors:**\n`;
+    for (const c of review.relatedContributors) {
+      body += `- **@${c.name}** — ${c.role}: ${c.reason}\n`;
+    }
+    body += `\n`;
+  }
+
+  body += `</details>\n\n`;
+  body += `> Reviewed by agent-pr-review. This is automated feedback — use your judgment.\n`;
 
   return body;
 }

@@ -3,7 +3,7 @@ import type { Env } from "./config.js";
 import { getInstallationOctokit } from "./github-app.js";
 import { fetchPRData } from "./fetch-pr.js";
 import { createLLMClient, callLLM } from "./llm.js";
-import { postReview } from "./post-review.js";
+import { runReviewFlow } from "./post-review.js";
 
 export function createWebhooks(env: Env): Webhooks {
   const webhooks = new Webhooks({ secret: env.GITHUB_WEBHOOK_SECRET });
@@ -23,34 +23,24 @@ export function createWebhooks(env: Env): Webhooks {
       return;
     }
 
-    console.log(
-      `PR #${pull_request.number} ${payload.action} — ${repository.full_name}`,
-    );
+    const { number, head } = pull_request;
+    const { login: owner } = repository.owner;
+    const { name: repo } = repository;
+
+    console.log(`PR #${number} ${payload.action} — ${repository.full_name}`);
 
     try {
       const octokit = await getInstallationOctokit(env, installationId);
-      const prData = await fetchPRData(
-        octokit,
-        repository.owner.login,
-        repository.name,
-        pull_request.number,
-      );
-
+      const prData = await fetchPRData(octokit, owner, repo, number);
       const llm = createLLMClient(env);
-      const review = await callLLM(llm, env, prData);
 
-      const reviewUrl = await postReview(
-        octokit,
-        repository.owner.login,
-        repository.name,
-        pull_request.number,
-        prData.headSha,
-        review,
+      const reviewUrl = await runReviewFlow(octokit, owner, repo, number, prData.headSha, () =>
+        callLLM(llm, env, prData),
       );
 
       console.log(`Review posted: ${reviewUrl}`);
     } catch (err) {
-      console.error(`Failed to review PR #${pull_request.number}:`, err);
+      console.error(`Failed to review PR #${number}:`, err);
     }
   });
 
