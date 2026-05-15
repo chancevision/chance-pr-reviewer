@@ -31,5 +31,5 @@ app.post("/webhook", async (c) => {
   return c.json({ status: "accepted" });
 });
 
-console.log(`agent-pr-review starting on port ${env.PORT}...`);
+console.log(`chance-pr-reviewer starting on port ${env.PORT}...`);
 serve({ fetch: app.fetch, port: env.PORT });

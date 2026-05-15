@@ -104,7 +104,7 @@ export function formatReviewBody(review: ReviewResult): string {
   }
 
   body += `</details>\n\n`;
-  body += `> Reviewed by agent-pr-review. This is automated feedback — use your judgment.\n`;
+  body += `> Reviewed by Chance PR Reviewer. This is automated feedback — use your judgment.\n`;
 
   return body;
 }

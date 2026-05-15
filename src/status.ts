@@ -15,7 +15,7 @@ export async function setCommitStatus(
       sha,
       state,
       description,
-      context: "agent-pr-review",
+      context: "chance-pr-reviewer",
     });
     return true;
   } catch (err: any) {

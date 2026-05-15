@@ -5,8 +5,8 @@ import type { Env } from "./config.js";
 
 export function createLLMClient(env: Env): OpenAI {
   const headers: Record<string, string> = {
-    "HTTP-Referer": "https://github.com/agent-pr-review",
-    "X-OpenRouter-Title": "PR Review Agent",
+    "HTTP-Referer": "https://github.com/chancevision/chance-pr-reviewer",
+    "X-OpenRouter-Title": "Chance PR Reviewer",
   };
 
   return new OpenAI({

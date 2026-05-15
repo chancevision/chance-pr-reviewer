@@ -2,7 +2,7 @@
 
 ## Project
 
-`agent-pr-review` — AI-powered GitHub PR review bot by [Chance Art and Technology Limited](https://github.com/chancevision). Listens for PR webhook events (opened, synchronize, reopened), sends the diff to an LLM via OpenAI-compatible API, and posts a structured review with a 5-point safety score.
+`chance-pr-reviewer` — AI-powered GitHub PR review bot by Chance AI. Listens for PR webhook events (opened, synchronize, reopened), sends the diff to an LLM via OpenAI-compatible API, and posts a structured review with a 5-point safety score.
 
 Open source under the MIT license.
 
