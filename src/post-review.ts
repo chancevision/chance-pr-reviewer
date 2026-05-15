@@ -96,6 +96,25 @@ export async function runReviewFlow(
   try {
     const review = await runReview();
 
+    // Check if PR was closed while we were reviewing
+    const { data: currentPR } = await octokit.pulls.get({
+      owner,
+      repo,
+      pull_number: pullNumber,
+    });
+
+    if (currentPR.state !== "open") {
+      console.log(`PR #${pullNumber} was closed during review — skipping post`);
+      await updatePlaceholderComment(
+        octokit,
+        owner,
+        repo,
+        placeholderId,
+        "🛑 PR was closed before the AI review completed. Review was cancelled.",
+      );
+      return "";
+    }
+
     const scoreDesc = `${review.overallScore.toFixed(1)}/5 — ${review.verdict}`;
     const statusState =
       review.verdict === "VERY_SAFE" || review.verdict === "SAFE"
