@@ -21,13 +21,58 @@ GitHub Webhook (PR event)
   → src/index.ts          Hono HTTP server, verifies webhook signature
   → src/webhook.ts        Routes pull_request events, orchestrates flow
   → src/github-app.ts     JWT auth → installation token → Octokit client
+  → src/status.ts         Sets commit status (pending → success/failure)
   → src/fetch-pr.ts       Fetches PR metadata, file list, unified diff
   → src/prompt.ts         Builds system + user messages for LLM
   → src/llm.ts            Calls OpenAI-compatible API (OpenRouter/DeepSeek/etc.), parses JSON, retries on failure
   → src/review-schema.ts  Zod schema for the structured LLM response
   → src/format-review.ts  Converts LLM JSON → GitHub Review markdown + inline comments
-  → src/post-review.ts    POSTs the review to GitHub via Octokit
+  → src/post-review.ts    Orchestrates review flow: placeholder comment, commit status, review posting
 ```
+
+## Review Flow
+
+1. Webhook received → immediate: set commit status to `pending`, post "AI review in progress..." comment
+2. Fetch PR diff + metadata → send to LLM
+3. LLM returns structured JSON (see review dimensions below)
+4. On success: delete placeholder comment, set commit status to `success`/`failure`, post GitHub Review
+5. On error: update placeholder comment with error message
+
+## Review Dimensions
+
+The LLM evaluates every PR across 6 checks:
+
+| Step | Field | What It Checks |
+|------|-------|----------------|
+| 1 | `reproducibility` | Can the issue/change be confirmed from source inspection? |
+| 2 | `behaviorProof` | Does the PR include screenshots, logs, or test evidence? |
+| 3 | `securityVerdict` | Standalone security assessment: deps, secrets, auth, injection, paths |
+| 4 | `dimensions` | 5-point scoring: codeQuality, security, performance, testing, consistency |
+| 5 | `acceptanceCriteria` | Exact test commands to verify the change |
+| 6 | `relatedContributors` | GitHub usernames inferred from file paths |
+
+## Merge Blocking
+
+Verdicts map to GitHub Review events:
+
+| Verdict | Score | Review Event | Merge Button |
+|---------|-------|-------------|--------------|
+| VERY_SAFE | ≥4.5 | `APPROVE` | Unblocked |
+| SAFE | ≥3.5 | `COMMENT` | Unblocked |
+| CAUTION | ≥2.5 | `REQUEST_CHANGES` | Blocked |
+| RISKY | <2.5 | `REQUEST_CHANGES` | Blocked |
+
+## GitHub App Permissions
+
+Required permissions for the GitHub App:
+
+| Permission | Level | Used For |
+|-----------|-------|----------|
+| Pull requests | Read & Write | Fetching PR data, posting reviews |
+| Contents | Read | Fetching PR diffs |
+| Commit statuses | Read & Write | Setting pending/success/failure status checks (optional — falls back gracefully if missing) |
+
+Subscribe to: **Pull request** events.
 
 ## Configuration
 
