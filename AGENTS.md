@@ -2,7 +2,9 @@
 
 ## Project
 
-`agent-pr-review` — AI-powered GitHub PR review bot. Listens for PR webhook events (opened, synchronize, reopened), sends the diff to an LLM via OpenAI-compatible API, and posts a structured review with a 5-point safety score.
+`agent-pr-review` — AI-powered GitHub PR review bot by [Chance Art and Technology Limited](https://github.com/chancevision). Listens for PR webhook events (opened, synchronize, reopened), sends the diff to an LLM via OpenAI-compatible API, and posts a structured review with a 5-point safety score.
+
+Open source under the MIT license.
 
 ## Commands
 
@@ -73,6 +75,10 @@ Required permissions for the GitHub App:
 | Commit statuses | Read & Write | Setting pending/success/failure status checks (optional — falls back gracefully if missing) |
 
 Subscribe to: **Pull request** events.
+
+Note: `Contents: Read` must be enabled for `Commit statuses: Read & Write` to be valid. If you change permissions, re-accept them on the Install App page.
+
+- `LLM_ENABLE_THINKING` — Enable reasoning/chain-of-thought mode (default: `false`)
 
 ## Configuration
 
