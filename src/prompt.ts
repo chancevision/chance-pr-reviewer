@@ -35,6 +35,8 @@ Respond with valid JSON only (no markdown fences). Use this schema:
   ]
 }
 
+Critical: Detect the language used in the PR title and description. Reply in that SAME language — all summary, detail, comment, issues, highlights, nextStep, and inlineComment strings must be written in the PR's language. E.g., if the PR is in Chinese, the entire review response must be in Chinese.
+
 Review rules:
 - Score 1 = critical problems, must fix before merge. Score 5 = flawless.
 - overallScore is the average of the 5 dimension scores (1 decimal place).
