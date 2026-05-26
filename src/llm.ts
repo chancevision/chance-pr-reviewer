@@ -28,7 +28,7 @@ function extractJson(text: string): string {
 export async function callLLM(
   client: OpenAI,
   env: Env,
-  opts: { title: string; body: string | null; files: string; diff: string },
+  opts: { title: string; body: string | null; files: string; diff: string; fileContexts?: Array<{ path: string; content: string }> },
 ): Promise<ReviewResult> {
   const messages = buildMessages(opts);
 

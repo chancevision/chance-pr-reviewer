@@ -48,27 +48,46 @@ Review rules:
 - STEP 6 — Related contributors: Based on the file paths and diff context, infer who might be the area owner or recent contributor. Use "unknown" if the diff doesn't provide enough info.
 - Keep each issue/highlight to 1 sentence. Be specific with file paths and line numbers.
 - Use the line numbers from the diff hunk headers (new file lines) for inlineComments.
-- The nextStep field must be a single, clear, actionable sentence.`;
+- The nextStep field must be a single, clear, actionable sentence.
+
+IMPORTANT — Full File Context: You will also receive the complete contents of each changed file (up to size limits). Use these to resolve references: if a diff introduces a variable that appears undeclared, check the full file content for its declaration before flagging it. Use the full files to understand imports, existing function signatures, class hierarchies, and surrounding logic. Base your review on the full file, not just the diff context lines.`;
 
 export function buildUserMessage(opts: {
   title: string;
   body: string | null;
   files: string;
   diff: string;
+  fileContexts?: Array<{ path: string; content: string }>;
 }): string {
-  return [
+  const sections = [
     "## PR Title",
     opts.title,
     "",
     "## PR Description",
     opts.body || "(no description)",
     "",
+  ];
+
+  if (opts.fileContexts && opts.fileContexts.length > 0) {
+    sections.push("## Full File Contents (for context — use to resolve references)");
+    for (const fc of opts.fileContexts) {
+      sections.push(`### ${fc.path}`);
+      sections.push("```");
+      sections.push(fc.content);
+      sections.push("```");
+      sections.push("");
+    }
+  }
+
+  sections.push(
     "## Changed Files",
     opts.files,
     "",
     "## Diff",
     opts.diff,
-  ].join("\n");
+  );
+
+  return sections.join("\n");
 }
 
 export function buildMessages(opts: {
@@ -76,6 +95,7 @@ export function buildMessages(opts: {
   body: string | null;
   files: string;
   diff: string;
+  fileContexts?: Array<{ path: string; content: string }>;
 }): Array<{ role: "system" | "user"; content: string }> {
   return [
     { role: "system", content: SYSTEM_PROMPT },
