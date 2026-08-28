@@ -161,10 +161,10 @@ Extend `fetch-pr.ts` (and a small helper module if needed). Existing GitHub App 
 
 After LLM JSON parse + Zod:
 
-1. Drop inline comments whose `file` is not in the PR file list (or related set is irrelevant — must be a file present in the diff for GitHub review comments).
-2. Drop comments whose `line` is not a valid right-side line in that file’s diff hunks (parse hunk headers from the unified diff once).
+1. Drop inline comments whose `file` is not among the PR’s changed files (GitHub only accepts review comments on the diff).
+2. Drop comments whose `line` is not a valid right-hand (new-file) line in that file’s unified-diff hunks (parse hunk headers once per review).
 3. Enforce caps: max 8 inline; max 3 suggestions; stable sort critical → warning → suggestion, then truncate.
-4. Derive verdict + status as above.
+4. Derive verdict + status from the filtered set (critical findings in the body still count toward blocking even if they have no inline anchor).
 5. Format slim body + post review; dismiss superseded app reviews when applicable.
 
 If `createReview` fails because of remaining bad lines, retry once with comments stripped (body-only) and log the failure — do not leave the placeholder hanging without an update.
