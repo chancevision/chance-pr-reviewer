@@ -40,35 +40,35 @@
 
 ### Task 1: Slim schema + prompt + formatter
 
-- [ ] Rewrite `src/review-schema.ts` to the approved slim shape (`summary`, `security`, `findings`, `inlineComments`, `confidence`)
-- [ ] Rewrite `src/prompt.ts` system prompt for high-signal rules; extend `buildUserMessage` to accept rules, codeowners, related files, contextNotes
-- [ ] Rewrite `src/format-review.ts` for short body + optional details (owners, omissions)
-- [ ] Commit
+- [x] Rewrite `src/review-schema.ts` to the approved slim shape (`summary`, `security`, `findings`, `inlineComments`, `confidence`)
+- [x] Rewrite `src/prompt.ts` system prompt for high-signal rules; extend `buildUserMessage` to accept rules, codeowners, related files, contextNotes
+- [x] Rewrite `src/format-review.ts` for short body + optional details (owners, omissions)
+- [x] Commit
 
 ### Task 2: Pure helpers
 
-- [ ] Add `src/diff-lines.ts` — `buildCommentableLines(diff): Map<string, Set<number>>`
-- [ ] Add `src/context-extras.ts` — `parseCodeowners`, `matchCodeowners`, `extractImportPaths`
-- [ ] Add `src/filter-review.ts` — `filterInlineComments`, `deriveReviewDecision`
-- [ ] Commit
+- [x] Add `src/diff-lines.ts` — `buildCommentableLines(diff): Map<string, Set<number>>`
+- [x] Add `src/context-extras.ts` — `parseCodeowners`, `matchCodeowners`, `extractImportPaths`
+- [x] Add `src/filter-review.ts` — `filterInlineComments`, `deriveReviewDecision`
+- [x] Commit
 
 ### Task 3: Fetch context pack + LLM wiring
 
-- [ ] Extend `PRData` and `fetchPRData` for rulesFiles, relatedContexts, codeownersMatches, contextNotes
-- [ ] Update `callLLM` / webhook to pass full `PRData`
-- [ ] Commit
+- [x] Extend `PRData` and `fetchPRData` for rulesFiles, relatedContexts, codeownersMatches, contextNotes
+- [x] Update `callLLM` / webhook to pass full `PRData`
+- [x] Commit
 
 ### Task 4: Post-review + webhook gates
 
-- [ ] `webhook.ts`: skip draft / bot
-- [ ] `post-review.ts`: filter comments, derive verdict, dismiss superseded `CHANGES_REQUESTED`, body-only fallback on createReview failure
-- [ ] Commit
+- [x] `webhook.ts`: skip draft / bot
+- [x] `post-review.ts`: filter comments, derive verdict, dismiss superseded `CHANGES_REQUESTED`, body-only fallback on createReview failure
+- [x] Commit
 
 ### Task 5: Docs + verify
 
-- [ ] Update `AGENTS.md` (architecture, dimensions table → new flow, merge blocking table)
-- [ ] `npm run typecheck`
-- [ ] Push + open PR
+- [x] Update `AGENTS.md` (architecture, dimensions table → new flow, merge blocking table)
+- [x] `npm run typecheck`
+- [x] Push + open PR
 
 ## Done when
 
