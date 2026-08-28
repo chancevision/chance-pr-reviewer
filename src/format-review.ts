@@ -1,20 +1,5 @@
-import type { ReviewResult, InlineComment } from "./review-schema.js";
-
-const DIMENSION_LABELS: Record<string, string> = {
-  codeQuality: "Code Quality & Readability",
-  security: "Security",
-  performance: "Performance",
-  testing: "Testing & Reliability",
-  consistency: "Consistency & Best Practices",
-};
-
-const SCORE_PILL: Record<number, string> = {
-  1: "`🔴 1`",
-  2: "`🟠 2`",
-  3: "`🟡 3`",
-  4: "`🟢 4`",
-  5: "`🟢 5`",
-};
+import type { ReviewResult, InlineComment, Finding } from "./review-schema.js";
+import type { CodeownersMatch } from "./context-extras.js";
 
 const SEVERITY_EMOJI: Record<string, string> = {
   critical: "🔴",
@@ -22,90 +7,56 @@ const SEVERITY_EMOJI: Record<string, string> = {
   suggestion: "🔵",
 };
 
-const VERDICT_EMOJI: Record<string, string> = {
-  VERY_SAFE: "🟢",
-  SAFE: "🟢",
-  CAUTION: "🟡",
-  RISKY: "🔴",
-};
-
-function formatDimension(
-  key: string,
-  dim: { score: number; issues: string[]; highlights: string[] },
-): string {
-  const label = DIMENSION_LABELS[key] || key;
-  const pill = SCORE_PILL[dim.score] || `\`  ${dim.score}\``;
-  let out = `**${label}** ${pill}\n`;
-
-  if (dim.highlights.length > 0) {
-    for (const h of dim.highlights) {
-      out += `- ✅ ${h}\n`;
-    }
-  }
-
-  if (dim.issues.length > 0) {
-    for (const i of dim.issues) {
-      out += `- ⚠️ ${i}\n`;
-    }
-  }
-
-  if (dim.issues.length === 0 && dim.highlights.length === 0) {
-    out += "_No findings._\n";
-  }
-
-  out += "\n";
-  return out;
+function formatFinding(f: Finding, index: number): string {
+  const emoji = SEVERITY_EMOJI[f.severity] || "⚪";
+  return `${index}. ${emoji} ${f.title} — ${f.detail}`;
 }
 
-export function formatReviewBody(review: ReviewResult): string {
-  const v = VERDICT_EMOJI[review.verdict] || "⚪";
-  const sevV = review.securityVerdict.status === "cleared" ? "✅" : "🔴";
-  const repV = review.reproducibility.possible ? "✅" : "⚠️";
-  const proofV = review.behaviorProof.present ? "✅" : "⚠️";
+export interface FormatReviewOptions {
+  codeownersMatches?: CodeownersMatch[];
+  contextNotes?: string[];
+}
 
-  let body = `## AI Code Review\n\n`;
-  body += `> ${review.summary}\n\n`;
+export function formatReviewBody(
+  review: ReviewResult,
+  opts: FormatReviewOptions = {},
+): string {
+  let body = `## Chance Review\n\n`;
+  body += `${review.summary}\n\n`;
 
-  // Quick status table
-  body += `| | |\n|---|---|\n`;
-  body += `| Reproducibility | ${repV} ${review.reproducibility.method} |\n`;
-  body += `| Behavior Proof | ${proofV} ${review.behaviorProof.evidence} |\n`;
-  body += `| Security | ${sevV} ${review.securityVerdict.status} |\n`;
-  body += `| Next Step | ${review.nextStep} |\n`;
-  body += `\n`;
-
-  // Scores
-  for (const [key, dim] of Object.entries(review.dimensions)) {
-    body += formatDimension(key, dim);
-  }
-
-  body += `---\n`;
-  body += `**${v} Safety Score: ${review.overallScore.toFixed(1)}/5 — ${review.verdict}**\n\n`;
-
-  // Collapsible details (clawsweeper-style)
-  body += `<details>\n<summary>Review details</summary>\n\n`;
-  body += `**Evidence from source:** ${review.reproducibility.detail}\n\n`;
-  body += `**Security:** ${review.securityVerdict.detail}\n\n`;
-
-  if (review.acceptanceCriteria.length > 0) {
-    body += `**Acceptance criteria:**\n`;
-    for (const cmd of review.acceptanceCriteria) {
-      body += `- \`${cmd}\`\n`;
-    }
+  if (review.findings.length > 0) {
+    body += `**Findings**\n`;
+    review.findings.forEach((f, i) => {
+      body += `${formatFinding(f, i + 1)}\n`;
+    });
     body += `\n`;
   }
 
-  if (review.relatedContributors.length > 0) {
-    body += `**Likely related contributors:**\n`;
-    for (const c of review.relatedContributors) {
-      body += `- **@${c.name}** — ${c.role}: ${c.reason}\n`;
+  const secEmoji = review.security.status === "cleared" ? "✅" : "🔴";
+  body += `**Security:** ${secEmoji} ${review.security.status} — ${review.security.detail}\n\n`;
+
+  const matches = opts.codeownersMatches ?? [];
+  const notes = opts.contextNotes ?? [];
+  if (matches.length > 0 || notes.length > 0) {
+    body += `<details>\n<summary>Review context</summary>\n\n`;
+    if (matches.length > 0) {
+      body += `**Matched owners** (from CODEOWNERS — not notified):\n`;
+      for (const m of matches) {
+        body += `- \`${m.path}\` → ${m.owners.join(", ")} (rule \`${m.pattern}\`)\n`;
+      }
+      body += `\n`;
     }
-    body += `\n`;
+    if (notes.length > 0) {
+      body += `**Context notes:**\n`;
+      for (const n of notes) {
+        body += `- ${n}\n`;
+      }
+      body += `\n`;
+    }
+    body += `</details>\n\n`;
   }
 
-  body += `</details>\n\n`;
-  body += `> Reviewed by Chance PR Reviewer. This is automated feedback — use your judgment.\n`;
-
+  body += `> Chance PR Reviewer · comments only when confident\n`;
   return body;
 }
 

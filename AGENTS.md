@@ -2,7 +2,7 @@
 
 ## Project
 
-`chance-pr-reviewer` — AI-powered GitHub PR review bot by Chance AI. Listens for PR webhook events (opened, synchronize, reopened), sends the diff to an LLM via OpenAI-compatible API, and posts a structured review with a 5-point safety score.
+`chance-pr-reviewer` — AI-powered GitHub PR review bot by Chance AI. Listens for PR webhook events (opened, synchronize, reopened), sends the diff (plus light repo context) to an LLM via an OpenAI-compatible API, and posts a sparse, inline-first review. Merge-blocking decisions are derived in code from findings — not from free-form LLM score labels.
 
 Open source under the MIT license.
 
@@ -20,49 +20,65 @@ npm run typecheck    # Type-check without emitting
 
 ```
 GitHub Webhook (PR event)
-  → src/index.ts          Hono HTTP server, verifies webhook signature
-  → src/webhook.ts        Routes pull_request events, orchestrates flow
-  → src/github-app.ts     JWT auth → installation token → Octokit client
-  → src/status.ts         Sets commit status (pending → success/failure)
-  → src/fetch-pr.ts       Fetches PR metadata, file list, unified diff
-  → src/prompt.ts         Builds system + user messages for LLM
-  → src/llm.ts            Calls OpenAI-compatible API (OpenRouter/DeepSeek/etc.), parses JSON, retries on failure
-  → src/review-schema.ts  Zod schema for the structured LLM response
-  → src/format-review.ts  Converts LLM JSON → GitHub Review markdown + inline comments
-  → src/post-review.ts    Orchestrates review flow: placeholder comment, commit status, review posting
+  → src/index.ts           Hono HTTP server, verifies webhook signature
+  → src/webhook.ts         Routes pull_request events; skips drafts/bots
+  → src/github-app.ts      JWT auth → installation token → Octokit client
+  → src/status.ts          Sets commit status (pending → success/failure)
+  → src/fetch-pr.ts        Diff, changed files, rules, CODEOWNERS, related imports
+  → src/context-extras.ts  CODEOWNERS + import path helpers
+  → src/prompt.ts          Builds system + user messages for LLM
+  → src/llm.ts             OpenAI-compatible API call; JSON parse + retry
+  → src/review-schema.ts   Zod schema for the slim LLM response
+  → src/diff-lines.ts      Commentable (file, line) set from unified diff
+  → src/filter-review.ts   Caps/filters inline comments; derives review event
+  → src/format-review.ts   Short markdown body + inline comment text
+  → src/post-review.ts     Placeholder, dismiss superseded, post review
 ```
 
 ## Review Flow
 
-1. Webhook received → immediate: set commit status to `pending`, post "AI review in progress..." comment
-2. Fetch PR diff + metadata → send to LLM
-3. LLM returns structured JSON (see review dimensions below)
-4. On success: delete placeholder comment, set commit status to `success`/`failure`, post GitHub Review
-5. On error: update placeholder comment with error message
+1. Webhook received → skip if draft or bot author
+2. Set commit status to `pending`, post "AI review in progress..." comment
+3. Fetch PR diff + changed-file contents + rules / CODEOWNERS / import-related files
+4. LLM returns slim JSON (`summary`, `security`, `findings`, `inlineComments`, `confidence`)
+5. Validate inline comments against the diff; cap to 8 (max 3 suggestions)
+6. Derive GitHub review event + commit status in code
+7. Dismiss prior Chance `CHANGES_REQUESTED` reviews; post new review
+8. On error: update placeholder comment with error message
 
-## Review Dimensions
+## What the LLM Returns
 
-The LLM evaluates every PR across 6 checks:
+| Field | Role |
+|-------|------|
+| `summary` | 2–3 sentence overview |
+| `security` | `cleared` / `flagged` + one-sentence detail |
+| `inlineComments` | Line-anchored feedback (preferred) |
+| `findings` | Issues that cannot be anchored to a diff line |
+| `confidence` | `high` / `medium` / `low` — low never blocks merge |
 
-| Step | Field | What It Checks |
-|------|-------|----------------|
-| 1 | `reproducibility` | Can the issue/change be confirmed from source inspection? |
-| 2 | `behaviorProof` | Does the PR include screenshots, logs, or test evidence? |
-| 3 | `securityVerdict` | Standalone security assessment: deps, secrets, auth, injection, paths |
-| 4 | `dimensions` | 5-point scoring: codeQuality, security, performance, testing, consistency |
-| 5 | `acceptanceCriteria` | Exact test commands to verify the change |
-| 6 | `relatedContributors` | GitHub usernames inferred from file paths |
+Reviews are **inline-first**. No dimension scorecards, guessed test commands, or guessed `@`-mentions.
+
+## Context Pack
+
+In addition to the diff and changed-file contents (capped), the bot may include:
+
+- Rules files: `AGENTS.md`, `CLAUDE.md`, `.cursorrules`, `.cursor/rules/*` (size-capped)
+- `CODEOWNERS` (matched owners shown as plain text in optional details — not auto-pinged)
+- Up to 10 import-related files not in the diff
+- Omission notes when files are skipped for size/budget
 
 ## Merge Blocking
 
-Verdicts map to GitHub Review events:
+The LLM does **not** choose the GitHub review event. Code derives it:
 
-| Verdict | Score | Review Event | Merge Button |
-|---------|-------|-------------|--------------|
-| VERY_SAFE | ≥4.5 | `APPROVE` | Unblocked |
-| SAFE | ≥3.5 | `COMMENT` | Unblocked |
-| CAUTION | ≥2.5 | `REQUEST_CHANGES` | Blocked |
-| RISKY | <2.5 | `REQUEST_CHANGES` | Blocked |
+| Condition | Review Event | Commit Status |
+|-----------|--------------|---------------|
+| `confidence === "low"` | `COMMENT` | success |
+| Critical finding/inline **or** security flagged | `REQUEST_CHANGES` | failure |
+| Only warnings/suggestions | `COMMENT` | success |
+| No findings, security cleared | `APPROVE` | success |
+
+Status descriptions are short labels such as `clean`, `2 warnings`, or `security flagged` — not a fake `X.X/5` score.
 
 ## GitHub App Permissions
 
@@ -70,8 +86,8 @@ Required permissions for the GitHub App:
 
 | Permission | Level | Used For |
 |-----------|-------|----------|
-| Pull requests | Read & Write | Fetching PR data, posting reviews |
-| Contents | Read | Fetching PR diffs |
+| Pull requests | Read & Write | Fetching PR data, posting/dismissing reviews |
+| Contents | Read | Fetching PR diffs, rules, CODEOWNERS, related files |
 | Commit statuses | Read & Write | Setting pending/success/failure status checks (optional — falls back gracefully if missing) |
 
 Subscribe to: **Pull request** events.
