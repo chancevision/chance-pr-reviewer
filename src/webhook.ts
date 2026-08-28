@@ -5,6 +5,12 @@ import { fetchPRData } from "./fetch-pr.js";
 import { createLLMClient, callLLM } from "./llm.js";
 import { runReviewFlow } from "./post-review.js";
 
+function isBotLogin(login: string | undefined): boolean {
+  if (!login) return false;
+  const lower = login.toLowerCase();
+  return lower.endsWith("[bot]") || lower.endsWith("-bot");
+}
+
 export function createWebhooks(env: Env): Webhooks {
   const webhooks = new Webhooks({ secret: env.GITHUB_WEBHOOK_SECRET });
 
@@ -23,7 +29,20 @@ export function createWebhooks(env: Env): Webhooks {
       return;
     }
 
-    const { number, head } = pull_request;
+    if (pull_request.draft) {
+      console.log(`PR #${pull_request.number} is draft — skipping review`);
+      return;
+    }
+
+    const sender = payload.sender;
+    if (sender?.type === "Bot" || isBotLogin(sender?.login)) {
+      console.log(
+        `PR #${pull_request.number} from bot ${sender?.login} — skipping review`,
+      );
+      return;
+    }
+
+    const { number } = pull_request;
     const { login: owner } = repository.owner;
     const { name: repo } = repository;
 
@@ -34,8 +53,13 @@ export function createWebhooks(env: Env): Webhooks {
       const prData = await fetchPRData(octokit, owner, repo, number);
       const llm = createLLMClient(env);
 
-      const reviewUrl = await runReviewFlow(octokit, owner, repo, number, prData.headSha, () =>
-        callLLM(llm, env, prData),
+      const reviewUrl = await runReviewFlow(
+        octokit,
+        owner,
+        repo,
+        number,
+        prData,
+        () => callLLM(llm, env, prData),
       );
 
       console.log(`Review posted: ${reviewUrl}`);

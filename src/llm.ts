@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { reviewSchema, type ReviewResult } from "./review-schema.js";
 import { buildMessages } from "./prompt.js";
 import type { Env } from "./config.js";
+import type { PRData } from "./fetch-pr.js";
 
 export function createLLMClient(env: Env): OpenAI {
   const headers: Record<string, string> = {
@@ -28,9 +29,20 @@ function extractJson(text: string): string {
 export async function callLLM(
   client: OpenAI,
   env: Env,
-  opts: { title: string; body: string | null; files: string; diff: string; fileContexts?: Array<{ path: string; content: string }> },
+  prData: PRData,
 ): Promise<ReviewResult> {
-  const messages = buildMessages(opts);
+  const messages = buildMessages({
+    title: prData.title,
+    body: prData.body,
+    files: prData.files,
+    diff: prData.diff,
+    fileContexts: prData.fileContexts,
+    relatedContexts: prData.relatedContexts,
+    rulesFiles: prData.rulesFiles,
+    codeownersText: prData.codeownersText,
+    codeownersMatches: prData.codeownersMatches,
+    contextNotes: prData.contextNotes,
+  });
 
   let lastError: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -59,12 +71,17 @@ export async function callLLM(
     } catch (err) {
       lastError = err;
       if (attempt < 2) {
-        const detail = err instanceof SyntaxError
-          ? err.message
-          : err instanceof Error && 'issues' in (err as any)
-            ? (err as any).issues?.map((i: any) => i.path.join('.') + ': ' + i.message).join(', ')
-            : String(err);
-        console.warn(`LLM response parse failed (attempt ${attempt + 1}/3): ${detail}`);
+        const detail =
+          err instanceof SyntaxError
+            ? err.message
+            : err instanceof Error && "issues" in (err as any)
+              ? (err as any).issues
+                  ?.map((i: any) => i.path.join(".") + ": " + i.message)
+                  .join(", ")
+              : String(err);
+        console.warn(
+          `LLM response parse failed (attempt ${attempt + 1}/3): ${detail}`,
+        );
       }
     }
   }
