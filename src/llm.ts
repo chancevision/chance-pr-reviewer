@@ -26,6 +26,8 @@ function extractJson(text: string): string {
   return trimmed;
 }
 
+const MAX_OUTPUT_TOKENS = 32768;
+
 export async function callLLM(
   client: OpenAI,
   env: Env,
@@ -50,19 +52,39 @@ export async function callLLM(
       const params: Record<string, unknown> = {
         model: env.LLM_MODEL,
         messages,
-        max_tokens: 8192,
+        max_tokens: MAX_OUTPUT_TOKENS,
       };
 
       if (env.LLM_ENABLE_THINKING) {
         params.reasoning_effort = "high";
+        params.thinking = { type: "enabled" };
       } else {
         params.temperature = 0.3;
+        params.thinking = { type: "disabled" };
       }
 
       const completion = await client.chat.completions.create(params as any);
+      const choice = completion.choices[0];
+      const message = choice?.message as
+        | { content?: string | null; reasoning_content?: string }
+        | undefined;
 
-      const raw = completion.choices[0]?.message?.content;
-      if (!raw) throw new Error("Empty response from LLM");
+      if (choice?.finish_reason === "length") {
+        const reasoningTokens =
+          (completion.usage as { completion_tokens_details?: { reasoning_tokens?: number } })
+            ?.completion_tokens_details?.reasoning_tokens ?? "unknown";
+        throw new Error(
+          `LLM output truncated (finish_reason=length, reasoning_tokens=${reasoningTokens})`,
+        );
+      }
+
+      const raw = message?.content;
+      if (!raw) {
+        const reasoningLen = message?.reasoning_content?.length ?? 0;
+        throw new Error(
+          `Empty response from LLM (finish_reason=${choice?.finish_reason}, reasoning_chars=${reasoningLen})`,
+        );
+      }
 
       const json = extractJson(raw);
       const parsed = JSON.parse(json);
@@ -80,7 +102,7 @@ export async function callLLM(
                   .join(", ")
               : String(err);
         console.warn(
-          `LLM response parse failed (attempt ${attempt + 1}/3): ${detail}`,
+          `LLM call failed (attempt ${attempt + 1}/3): ${detail}`,
         );
       }
     }
