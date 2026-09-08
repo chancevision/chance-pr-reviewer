@@ -13,6 +13,12 @@ export interface FileContext {
   content: string;
 }
 
+export interface LinkedIssue {
+  number: number;
+  title: string;
+  body: string | null;
+}
+
 export interface PRData {
   title: string;
   body: string | null;
@@ -25,6 +31,7 @@ export interface PRData {
   rulesFiles: FileContext[];
   codeownersText: string | null;
   codeownersMatches: CodeownersMatch[];
+  linkedIssues: LinkedIssue[];
   contextNotes: string[];
 }
 
@@ -33,6 +40,8 @@ const MAX_TOTAL_CONTEXT = 200 * 1024;
 const MAX_FILES = 30;
 const MAX_RELATED = 10;
 const MAX_RULES_BYTES = 32 * 1024;
+const MAX_LINKED_ISSUES = 3;
+const MAX_ISSUE_BODY = 2000;
 
 const RULE_FILE_CANDIDATES = ["AGENTS.md", "CLAUDE.md", ".cursorrules"];
 const CODEOWNERS_CANDIDATES = [
@@ -91,6 +100,56 @@ async function fetchFirstExisting(
     }
   }
   return null;
+}
+
+// Same-repo `#123` refs only: the lookbehind rejects `owner/repo#123` so we
+// never resolve a cross-repo ref against this repo's issue numbers.
+function extractIssueRefs(body: string | null): number[] {
+  if (!body) return [];
+  const refs: number[] = [];
+  const re = /(?<![\w./-])#(\d+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(body)) !== null) {
+    const n = Number(m[1]);
+    if (!refs.includes(n)) refs.push(n);
+    if (refs.length >= MAX_LINKED_ISSUES) break;
+  }
+  return refs;
+}
+
+async function fetchLinkedIssues(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  body: string | null,
+  contextNotes: string[],
+): Promise<LinkedIssue[]> {
+  const refs = extractIssueRefs(body);
+  if (refs.length === 0) return [];
+
+  const issues: LinkedIssue[] = [];
+  for (const n of refs) {
+    try {
+      const { data } = await octokit.issues.get({
+        owner,
+        repo,
+        issue_number: n,
+      });
+      const truncated =
+        data.body && data.body.length > MAX_ISSUE_BODY
+          ? data.body.slice(0, MAX_ISSUE_BODY) + "\n…(truncated)"
+          : data.body;
+      issues.push({ number: n, title: data.title, body: truncated ?? null });
+    } catch {
+      // Missing Issues: Read permission, or the ref is not an issue in this repo.
+    }
+  }
+  if (issues.length === 0) {
+    contextNotes.push(
+      `PR references issue(s) ${refs.map((n) => `#${n}`).join(", ")} but they could not be fetched (grant Issues: Read to include them as spec context)`,
+    );
+  }
+  return issues;
 }
 
 async function listCursorRules(
@@ -152,6 +211,14 @@ export async function fetchPRData(
   const contextNotes: string[] = [];
   const changedFilePaths = prFiles.map(
     (f: { filename: string }) => f.filename as string,
+  );
+
+  const linkedIssues = await fetchLinkedIssues(
+    octokit,
+    owner,
+    repo,
+    pr.data.body,
+    contextNotes,
   );
 
   // --- Changed file full contents ---
@@ -308,6 +375,7 @@ export async function fetchPRData(
     rulesFiles,
     codeownersText,
     codeownersMatches,
+    linkedIssues,
     contextNotes,
   };
 }
