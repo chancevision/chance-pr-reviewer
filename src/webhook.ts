@@ -14,12 +14,17 @@ function isBotLogin(login: string | undefined): boolean {
 export function createWebhooks(env: Env): Webhooks {
   const webhooks = new Webhooks({ secret: env.GITHUB_WEBHOOK_SECRET });
 
-  const isPRCreation = (action: string): boolean =>
-    action === "opened" || action === "synchronize" || action === "reopened";
+  const isReviewableAction = (action: string): boolean =>
+    action === "opened" ||
+    action === "synchronize" ||
+    action === "reopened" ||
+    // A draft PR marked ready sends only this action — without it the
+    // review would wait for the next push.
+    action === "ready_for_review";
 
   webhooks.on("pull_request", async (event) => {
     const { payload } = event;
-    if (!isPRCreation(payload.action)) return;
+    if (!isReviewableAction(payload.action)) return;
 
     const repository = payload.repository;
     const pull_request = payload.pull_request;
