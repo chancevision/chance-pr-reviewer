@@ -24,7 +24,7 @@ GitHub Webhook (PR event)
   → src/webhook.ts         Routes pull_request events; skips drafts/bots
   → src/github-app.ts      JWT auth → installation token → Octokit client
   → src/status.ts          Sets commit status (pending → success/failure)
-  → src/fetch-pr.ts        Diff, changed files, rules, CODEOWNERS, related imports
+  → src/fetch-pr.ts        Diff, changed files, rules, CODEOWNERS, related imports, linked issues
   → src/context-extras.ts  CODEOWNERS + import path helpers
   → src/prompt.ts          Builds system + user messages for LLM
   → src/llm.ts             OpenAI-compatible API call; JSON parse + retry
@@ -39,7 +39,7 @@ GitHub Webhook (PR event)
 
 1. Webhook received → skip if draft or bot author
 2. Set commit status to `pending`, post "AI review in progress..." comment
-3. Fetch PR diff + changed-file contents + rules / CODEOWNERS / import-related files
+3. Fetch PR diff + changed-file contents + rules / CODEOWNERS / import-related files / linked issues
 4. LLM returns slim JSON (`summary`, `security`, `findings`, `inlineComments`, `confidence`)
 5. Validate inline comments against the diff; cap to 8 (max 3 suggestions)
 6. Derive GitHub review event + commit status in code
@@ -65,6 +65,7 @@ In addition to the diff and changed-file contents (capped), the bot may include:
 - Rules files: `AGENTS.md`, `CLAUDE.md`, `.cursorrules`, `.cursor/rules/*` (size-capped)
 - `CODEOWNERS` (matched owners shown as plain text in optional details — not auto-pinged)
 - Up to 10 import-related files not in the diff
+- Linked issues referenced in the PR body (`#123`, `Closes #123`), capped at 3 with truncated bodies — used as the spec source for requirement checks
 - Omission notes when files are skipped for size/budget
 
 ## Merge Blocking
@@ -89,6 +90,7 @@ Required permissions for the GitHub App:
 | Pull requests | Read & Write | Fetching PR data, posting/dismissing reviews |
 | Contents | Read | Fetching PR diffs, rules, CODEOWNERS, related files |
 | Commit statuses | Read & Write | Setting pending/success/failure status checks (optional — falls back gracefully if missing) |
+| Issues | Read | Fetching linked issues as spec context (optional — skipped with a context note if missing) |
 
 Subscribe to: **Pull request** events.
 
