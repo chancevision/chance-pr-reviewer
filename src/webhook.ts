@@ -39,10 +39,14 @@ export function createWebhooks(env: Env): Webhooks {
       return;
     }
 
-    const sender = payload.sender;
-    if (sender?.type === "Bot" || isBotLogin(sender?.login)) {
+    // Skip bot-authored PRs (dependabot, renovate, ...). Check the PR
+    // author, not payload.sender: on synchronize the sender is whoever
+    // pushed, and skipping bot senders would drop re-reviews when an
+    // automation (e.g. cursor[bot]) pushes commits to a human's PR.
+    const author = pull_request.user;
+    if (author?.type === "Bot" || isBotLogin(author?.login)) {
       console.log(
-        `PR #${pull_request.number} from bot ${sender?.login} — skipping review`,
+        `PR #${pull_request.number} authored by bot ${author?.login} — skipping review`,
       );
       return;
     }

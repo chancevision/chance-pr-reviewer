@@ -21,7 +21,7 @@ npm run typecheck    # Type-check without emitting
 ```
 GitHub Webhook (PR event)
   → src/index.ts           Hono HTTP server, verifies webhook signature
-  → src/webhook.ts         Routes pull_request events; skips drafts/bots
+  → src/webhook.ts         Routes pull_request events; skips drafts/bot-authored PRs
   → src/github-app.ts      JWT auth → installation token → Octokit client
   → src/status.ts          Sets commit status (pending → success/failure)
   → src/fetch-pr.ts        Diff, changed files, rules, CODEOWNERS, related imports, linked issues
