@@ -2,7 +2,7 @@
 
 ## Project
 
-`chance-pr-reviewer` — AI-powered GitHub PR review bot by Chance AI. Listens for PR webhook events (opened, synchronize, reopened), sends the diff (plus light repo context) to an LLM via an OpenAI-compatible API, and posts a sparse, inline-first review. Merge-blocking decisions are derived in code from findings — not from free-form LLM score labels.
+`chance-pr-reviewer` — AI-powered GitHub PR review bot by Chance AI. Listens for PR webhook events (opened, synchronize, reopened, ready_for_review), sends the diff (plus light repo context) to an LLM via an OpenAI-compatible API, and posts a sparse, inline-first review. Merge-blocking decisions are derived in code from findings — not from free-form LLM score labels.
 
 Open source under the MIT license.
 
