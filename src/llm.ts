@@ -43,6 +43,7 @@ export async function callLLM(
     rulesFiles: prData.rulesFiles,
     codeownersText: prData.codeownersText,
     codeownersMatches: prData.codeownersMatches,
+    linkedIssues: prData.linkedIssues,
     contextNotes: prData.contextNotes,
   });
 
