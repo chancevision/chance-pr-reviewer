@@ -26,7 +26,15 @@ function extractJson(text: string): string {
   return trimmed;
 }
 
-const MAX_OUTPUT_TOKENS = 32768;
+// In thinking mode the reasoning tokens count against max_tokens. A cap that
+// is too low lets the reasoning use all of it and leaves no room for the
+// review itself (finish_reason=length with empty content).
+const REASONING_EFFORT = "high";
+// Used for the next attempt after a truncated one, so a retry is not a
+// repeat of the request that just ran out of room.
+const REASONING_EFFORT_AFTER_TRUNCATION = "low";
+
+class TruncatedOutputError extends Error {}
 
 export async function callLLM(
   client: OpenAI,
@@ -48,16 +56,17 @@ export async function callLLM(
   });
 
   let lastError: unknown;
+  let reasoningEffort = REASONING_EFFORT;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const params: Record<string, unknown> = {
         model: env.LLM_MODEL,
         messages,
-        max_tokens: MAX_OUTPUT_TOKENS,
+        max_tokens: env.LLM_MAX_OUTPUT_TOKENS,
       };
 
       if (env.LLM_ENABLE_THINKING) {
-        params.reasoning_effort = "high";
+        params.reasoning_effort = reasoningEffort;
         params.thinking = { type: "enabled" };
       } else {
         params.temperature = 0.3;
@@ -74,8 +83,8 @@ export async function callLLM(
         const reasoningTokens =
           (completion.usage as { completion_tokens_details?: { reasoning_tokens?: number } })
             ?.completion_tokens_details?.reasoning_tokens ?? "unknown";
-        throw new Error(
-          `LLM output truncated (finish_reason=length, reasoning_tokens=${reasoningTokens})`,
+        throw new TruncatedOutputError(
+          `LLM output truncated (finish_reason=length, reasoning_tokens=${reasoningTokens}, max_tokens=${env.LLM_MAX_OUTPUT_TOKENS}, reasoning_effort=${env.LLM_ENABLE_THINKING ? reasoningEffort : "off"})`,
         );
       }
 
@@ -93,6 +102,9 @@ export async function callLLM(
       return result;
     } catch (err) {
       lastError = err;
+      if (err instanceof TruncatedOutputError) {
+        reasoningEffort = REASONING_EFFORT_AFTER_TRUNCATION;
+      }
       if (attempt < 2) {
         const detail =
           err instanceof SyntaxError
