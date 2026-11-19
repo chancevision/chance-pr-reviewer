@@ -11,6 +11,13 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .transform((v) => v === "true")
     .default("false"),
+  // Shared by reasoning and the review text. Must not exceed the model's
+  // maximum output (DeepSeek: 393216).
+  LLM_MAX_OUTPUT_TOKENS: z
+    .string()
+    .regex(/^[1-9]\d*$/, "LLM_MAX_OUTPUT_TOKENS must be a positive integer")
+    .transform((v) => Number(v))
+    .default("131072"),
   PORT: z
     .string()
     .transform((v) => Number(v))

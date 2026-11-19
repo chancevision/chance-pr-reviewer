@@ -104,6 +104,7 @@ All config via environment variables (see `.env.example`):
 - `LLM_BASE_URL` — OpenAI-compatible API base URL (default: OpenRouter)
 - `LLM_API_KEY` — API key for the LLM provider
 - `LLM_MODEL` — Model name (default: `deepseek/deepseek-v4-pro`)
+- `LLM_MAX_OUTPUT_TOKENS` — Output cap per LLM call, shared by reasoning and the review text (default: `131072`). After a truncated attempt the retry drops `reasoning_effort` from `high` to `low`
 - `GITHUB_APP_ID` — GitHub App ID
 - `GITHUB_APP_PRIVATE_KEY` — GitHub App private key (PEM, `\n` escaped)
 - `GITHUB_WEBHOOK_SECRET` — Webhook secret for signature verification
